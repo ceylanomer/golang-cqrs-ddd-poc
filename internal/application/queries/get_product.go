@@ -1,24 +1,24 @@
 package queries
 
 import (
+	"context"
+
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
 )
 
 type GetProductQuery struct {
-	ID uuid.UUID
+	ID uuid.UUID `params:"id"`
 }
 
 type GetProductHandler struct {
-	repo product.Repository
+	repo product.ReadOnlyRepository
 }
 
-func NewGetProductHandler(repo product.Repository) *GetProductHandler {
-	return &GetProductHandler{
-		repo: repo,
-	}
+func NewGetProductHandler(repo product.ReadOnlyRepository) *GetProductHandler {
+	return &GetProductHandler{repo: repo}
 }
 
-func (h *GetProductHandler) Handle(query GetProductQuery) (*product.Product, error) {
-	return h.repo.GetByID(query.ID)
+func (h *GetProductHandler) Handle(ctx context.Context, query *GetProductQuery) (*product.ProductReadModel, error) {
+	return h.repo.FindByID(ctx, query.ID)
 }

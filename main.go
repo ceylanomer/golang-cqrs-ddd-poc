@@ -2,107 +2,69 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/application/commands"
-	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/application/queries"
-	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/infrastructure/persistence"
-	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/interfaces/http/handlers"
-	applogger "github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
-	"github.com/gofiber/contrib/fiberzap"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/interfaces/http/router"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 func main() {
 	// Initialize logger
-	applogger.Init()
-	log := applogger.GetLogger()
-	defer zap.L().Sync()
+	logger.Init()
+	log := logger.GetLogger()
 	defer log.Sync()
 
-	// Initialize repository
-	productRepo := persistence.NewMemoryProductRepository()
-
-	// Add some sample data
-	sampleProduct := &product.Product{
-		ID:          uuid.New(),
-		Name:        "Sample Product",
-		Description: "This is a sample product",
-		Price:       99.99,
+	// Initialize database connection
+	db, err := sql.Open("postgres", "user=postgres password=postgres dbname=postgres sslmode=disable")
+	if err != nil {
+		log.Fatal("Failed to connect to database", zap.Error(err))
 	}
-	productRepo.Save(sampleProduct)
-	//log.Info("Created sample product", zap.String("id", sampleProduct.ID.String()))
-	zap.L().Info("Created sample product", zap.String("id", sampleProduct.ID.String()))
+	defer db.Close()
 
-	// Initialize handlers
-	getProductHandler := queries.NewGetProductHandler(productRepo)
-	createProductHandler := commands.NewCreateProductHandler(productRepo)
-	updateProductHandler := commands.NewUpdateProductHandler(productRepo)
-	deleteProductHandler := commands.NewDeleteProductHandler(productRepo)
+	// Initialize repositories
+	productRepo := persistence.NewPostgresRepository(db)
 
-	// Initialize HTTP handlers
-	productHandler := handlers.NewProductHandler(
-		getProductHandler,
-		createProductHandler,
-		updateProductHandler,
-		deleteProductHandler,
-	)
-
-	// Setup Fiber with custom config
+	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
-		// Add graceful shutdown timeout
 		ReadTimeout:  time.Second * 15,
 		WriteTimeout: time.Second * 15,
 		IdleTimeout:  time.Second * 60,
 	})
 
-	// Use fiberzap to log requests
-	app.Use(fiberzap.New(fiberzap.Config{
-		Logger: log,
-	}))
+	// Setup routes
+	router.SetupProductRoutes(app, productRepo, productRepo)
 
-	// Routes
-	api := app.Group("/api")
-	v1 := api.Group("/v1")
-
-	products := v1.Group("/products")
-	products.Get("/:id", productHandler.GetProduct)
-	products.Post("/", productHandler.CreateProduct)
-	products.Put("/:id", productHandler.UpdateProduct)
-	products.Delete("/:id", productHandler.DeleteProduct)
-
-	// Create channel for shutdown signals
+	// Graceful shutdown channel
 	shutdownChan := make(chan os.Signal, 1)
-	// Catch SIGINT and SIGTERM signals
 	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start server in a goroutine
+	// Start server
 	go func() {
 		if err := app.Listen(":8080"); err != nil {
-			zap.L().Fatal("Error starting server", zap.Error(err))
+			log.Fatal("Error starting server", zap.Error(err))
 		}
 	}()
 
-	zap.L().Info("Server started on :8080")
+	log.Info("Server started on :8080")
 
 	// Wait for shutdown signal
 	<-shutdownChan
-	zap.L().Info("Shutting down server...")
+	log.Info("Shutting down server...")
 
-	// Create shutdown context with timeout
+	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Shutdown the server
 	if err := app.ShutdownWithContext(ctx); err != nil {
-		zap.L().Fatal("Server forced to shutdown", zap.Error(err))
+		log.Fatal("Server forced to shutdown", zap.Error(err))
 	}
 
-	zap.L().Info("Server gracefully stopped")
+	log.Info("Server gracefully stopped")
 }

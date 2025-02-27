@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"context"
+
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
 )
@@ -19,6 +21,15 @@ func NewDeleteProductHandler(repo product.Repository) *DeleteProductHandler {
 	}
 }
 
-func (h *DeleteProductHandler) Handle(cmd DeleteProductCommand) error {
-	return h.repo.Delete(cmd.ID)
+func (h *DeleteProductHandler) Handle(ctx context.Context, cmd *DeleteProductCommand) (*product.Product, error) {
+	product, err := h.repo.GetByID(ctx, cmd.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.repo.Delete(ctx, cmd.ID); err != nil {
+		return nil, err
+	}
+
+	return product, nil
 }
