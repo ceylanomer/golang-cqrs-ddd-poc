@@ -4,3 +4,9 @@
 # Config files
 /config/config.yaml
 
+# Docker volumes
+postgres_data/
+
+# Binary
+main
+
