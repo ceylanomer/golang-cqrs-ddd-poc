@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,9 +10,12 @@ import (
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/infrastructure/persistence"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/interfaces/http/router"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/config"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -21,21 +24,31 @@ func main() {
 	log := logger.GetLogger()
 	defer log.Sync()
 
-	// Initialize database connection
-	db, err := sql.Open("postgres", "user=postgres password=postgres dbname=postgres sslmode=disable")
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatal("Failed to load configuration", zap.Error(err))
+	}
+
+	// Initialize database connection with GORM
+	db, err := gorm.Open(postgres.Open(cfg.Database.GetDSN()), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database", zap.Error(err))
 	}
-	defer db.Close()
+
+	// Auto migrate the schema
+	if err := db.AutoMigrate(&persistence.ProductModel{}); err != nil {
+		log.Fatal("Failed to migrate database schema", zap.Error(err))
+	}
 
 	// Initialize repositories
-	productRepo := persistence.NewPostgresRepository(db)
+	productRepo := persistence.NewGormRepository(db)
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
-		ReadTimeout:  time.Second * 15,
-		WriteTimeout: time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	})
 
 	// Setup routes
@@ -47,12 +60,13 @@ func main() {
 
 	// Start server
 	go func() {
-		if err := app.Listen(":8080"); err != nil {
+		serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
+		if err := app.Listen(serverAddr); err != nil {
 			log.Fatal("Error starting server", zap.Error(err))
 		}
 	}()
 
-	log.Info("Server started on :8080")
+	log.Info("Server started", zap.Int("port", cfg.Server.Port))
 
 	// Wait for shutdown signal
 	<-shutdownChan
@@ -64,6 +78,16 @@ func main() {
 
 	if err := app.ShutdownWithContext(ctx); err != nil {
 		log.Fatal("Server forced to shutdown", zap.Error(err))
+	}
+
+	// Close database connection
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Error("Error getting underlying *sql.DB", zap.Error(err))
+	} else {
+		if err := sqlDB.Close(); err != nil {
+			log.Error("Error closing database connection", zap.Error(err))
+		}
 	}
 
 	log.Info("Server gracefully stopped")

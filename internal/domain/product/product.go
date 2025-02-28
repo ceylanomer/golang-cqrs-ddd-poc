@@ -145,6 +145,19 @@ func (p *Product) StockUnit() string     { return p.stock.unit }
 func (p *Product) Status() ProductStatus { return p.status }
 func (p *Product) Version() int          { return p.version }
 
+// Setters for persistence layer
+func (p *Product) SetID(id uuid.UUID) {
+	p.id = id
+}
+
+func (p *Product) SetStatus(status ProductStatus) {
+	p.status = status
+}
+
+func (p *Product) SetVersion(version int) {
+	p.version = version
+}
+
 // Price methods
 func (p Price) Amount() float64 {
 	return p.amount
