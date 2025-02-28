@@ -8,23 +8,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type GormRepository struct {
+type ProductRepository struct {
 	db *gorm.DB
 }
 
-func NewGormRepository(db *gorm.DB) *GormRepository {
-	return &GormRepository{
+func NewProductRepository(db *gorm.DB) *ProductRepository {
+	return &ProductRepository{
 		db: db,
 	}
 }
 
 // Write Repository Implementation
-func (r *GormRepository) Save(ctx context.Context, product *product.Product) error {
+func (r *ProductRepository) Save(ctx context.Context, product *product.Product) error {
 	model := FromDomain(product)
 	return r.db.WithContext(ctx).Create(model).Error
 }
 
-func (r *GormRepository) Update(ctx context.Context, product *product.Product) error {
+func (r *ProductRepository) Update(ctx context.Context, product *product.Product) error {
 	model := FromDomain(product)
 	result := r.db.WithContext(ctx).Model(&ProductModel{}).
 		Where("id = ? AND version = ?", model.ID, model.Version-1).
@@ -41,7 +41,7 @@ func (r *GormRepository) Update(ctx context.Context, product *product.Product) e
 	return nil
 }
 
-func (r *GormRepository) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *ProductRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	result := r.db.WithContext(ctx).Delete(&ProductModel{}, id)
 	if result.Error != nil {
 		return result.Error
@@ -54,7 +54,7 @@ func (r *GormRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *GormRepository) GetByID(ctx context.Context, id uuid.UUID) (*product.Product, error) {
+func (r *ProductRepository) GetByID(ctx context.Context, id uuid.UUID) (*product.Product, error) {
 	var model ProductModel
 	if err := r.db.WithContext(ctx).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -67,7 +67,7 @@ func (r *GormRepository) GetByID(ctx context.Context, id uuid.UUID) (*product.Pr
 }
 
 // Read Repository Implementation
-func (r *GormRepository) FindByID(ctx context.Context, id uuid.UUID) (*product.ProductReadModel, error) {
+func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*product.ProductReadModel, error) {
 	var model ProductModel
 	if err := r.db.WithContext(ctx).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -89,7 +89,7 @@ func (r *GormRepository) FindByID(ctx context.Context, id uuid.UUID) (*product.P
 	}, nil
 }
 
-func (r *GormRepository) FindAll(ctx context.Context, filter product.ProductFilter) ([]product.ProductReadModel, error) {
+func (r *ProductRepository) FindAll(ctx context.Context, filter product.ProductFilter) ([]product.ProductReadModel, error) {
 	var models []ProductModel
 	query := r.db.WithContext(ctx)
 
@@ -142,7 +142,7 @@ func (r *GormRepository) FindAll(ctx context.Context, filter product.ProductFilt
 	return readModels, nil
 }
 
-func (r *GormRepository) FindByStatus(ctx context.Context, status product.ProductStatus) ([]product.ProductReadModel, error) {
+func (r *ProductRepository) FindByStatus(ctx context.Context, status product.ProductStatus) ([]product.ProductReadModel, error) {
 	var models []ProductModel
 	if err := r.db.WithContext(ctx).Where("status = ?", status).Find(&models).Error; err != nil {
 		return nil, err

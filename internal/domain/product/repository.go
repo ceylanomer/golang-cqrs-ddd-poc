@@ -2,7 +2,6 @@ package product
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
 )
@@ -46,15 +45,4 @@ type ProductFilter struct {
 	PageNumber int
 }
 
-// For in-memory repository
-func NewMemoryRepository() Repository {
-	// Implementation of NewMemoryRepository
-	return nil
-}
-
-// For PostgreSQL repository
-func NewPostgresRepository(db *sql.DB) Repository {
-	// Implementation of NewPostgresRepository
-	return nil
-}
 

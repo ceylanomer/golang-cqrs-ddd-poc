@@ -42,7 +42,7 @@ func main() {
 	}
 
 	// Initialize repositories
-	productRepo := persistence.NewGormRepository(db)
+	productRepo := persistence.NewProductRepository(db)
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
