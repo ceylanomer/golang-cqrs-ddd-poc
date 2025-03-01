@@ -23,6 +23,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 func main() {
@@ -58,7 +59,8 @@ func main() {
 	}
 
 	// Register OpenTelemetry callbacks
-	if err := persistence.RegisterGormTracing(db, tp); err != nil {
+	err = db.Use(tracing.NewPlugin(tracing.WithTracerProvider(tp)))
+	if err != nil {
 		log.Fatal("Failed to register GORM tracing", zap.Error(err))
 	}
 
@@ -87,6 +89,7 @@ func main() {
 	// Then add logging middleware
 	app.Use(fiberzap.New(fiberzap.Config{
 		Logger: log,
+		SkipURIs: []string{"/metrics"},
 	}))
 
 	// Setup routes
