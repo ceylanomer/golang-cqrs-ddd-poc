@@ -84,10 +84,49 @@ func startSpan(db *gorm.DB, tracer trace.Tracer, operation string) {
 	newCtx, span := tracer.Start(ctx, spanName, opts...)
 	db.Statement.Context = newCtx
 
-	db.Callback().Create().After("*").Register("otel:after", func(db *gorm.DB) {
-		defer span.End()
-		if db.Error != nil {
-			span.RecordError(db.Error)
-		}
-	})
+	// Register after callback based on operation type
+	switch operation {
+	case "gorm.create":
+		db.Callback().Create().After("gorm:create").Register("otel:after_create", func(db *gorm.DB) {
+			defer span.End()
+			if db.Error != nil {
+				span.RecordError(db.Error)
+			}
+		})
+	case "gorm.query":
+		db.Callback().Query().After("gorm:query").Register("otel:after_query", func(db *gorm.DB) {
+			defer span.End()
+			if db.Error != nil {
+				span.RecordError(db.Error)
+			}
+		})
+	case "gorm.update":
+		db.Callback().Update().After("gorm:update").Register("otel:after_update", func(db *gorm.DB) {
+			defer span.End()
+			if db.Error != nil {
+				span.RecordError(db.Error)
+			}
+		})
+	case "gorm.delete":
+		db.Callback().Delete().After("gorm:delete").Register("otel:after_delete", func(db *gorm.DB) {
+			defer span.End()
+			if db.Error != nil {
+				span.RecordError(db.Error)
+			}
+		})
+	case "gorm.row":
+		db.Callback().Row().After("gorm:row").Register("otel:after_row", func(db *gorm.DB) {
+			defer span.End()
+			if db.Error != nil {
+				span.RecordError(db.Error)
+			}
+		})
+	case "gorm.raw":
+		db.Callback().Raw().After("gorm:raw").Register("otel:after_raw", func(db *gorm.DB) {
+			defer span.End()
+			if db.Error != nil {
+				span.RecordError(db.Error)
+			}
+		})
+	}
 }
