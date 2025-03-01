@@ -14,12 +14,12 @@ import (
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/config"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/tracer"
+	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/contrib/otelfiber/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	recover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/gofiber/contrib/fiberzap/v2"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -77,8 +77,14 @@ func main() {
 		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	})
 
+	// Middleware order is important for tracing
 	app.Use(recover.New())
-	app.Use(otelfiber.Middleware())
+	// Add OpenTelemetry middleware first to create the parent span
+	app.Use(otelfiber.Middleware(otelfiber.WithNext(func(c *fiber.Ctx) bool {
+		// Skip tracing for metrics endpoint
+		return c.Path() == "/metrics"
+	})))
+	// Then add logging middleware
 	app.Use(fiberzap.New(fiberzap.Config{
 		Logger: log,
 	}))

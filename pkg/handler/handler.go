@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 )
 
@@ -21,19 +22,30 @@ func Handler[R Request, Res Response](handler HandlerInterface[R, Res]) fiber.Ha
 	return func(c *fiber.Ctx) error {
 		var req R
 
+		// Start a new span for this handler
+		ctx := c.UserContext()
+		tracer := otel.GetTracerProvider().Tracer("")
+		spanName := c.Route().Path
+		ctx, span := tracer.Start(ctx, spanName)
+		defer span.End()
+
 		if err := c.BodyParser(&req); err != nil && !errors.Is(err, fiber.ErrUnprocessableEntity) {
+			span.RecordError(err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 
 		if err := c.ParamsParser(&req); err != nil {
+			span.RecordError(err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 
 		if err := c.QueryParser(&req); err != nil {
+			span.RecordError(err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 
 		if err := c.ReqHeaderParser(&req); err != nil {
+			span.RecordError(err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 
@@ -42,10 +54,9 @@ func Handler[R Request, Res Response](handler HandlerInterface[R, Res]) fiber.Ha
 			defer cancel()
 		*/
 
-		ctx := c.UserContext()
-
 		res, err := handler.Handle(ctx, &req)
 		if err != nil {
+			span.RecordError(err)
 			zap.L().Error("Failed to handle request", zap.Error(err))
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
