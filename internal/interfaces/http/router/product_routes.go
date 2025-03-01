@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/application/client"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/application/commands"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/application/queries"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
@@ -12,6 +13,8 @@ func SetupProductRoutes(
 	app *fiber.App,
 	writeRepo product.Repository,
 	readRepo product.ReadOnlyRepository,
+	noRetryClient client.CustomHttpClient,
+	retryableClient client.CustomRetryableClient,
 ) {
 	api := app.Group("/api")
 	v1 := api.Group("/v1")

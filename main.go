@@ -8,11 +8,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/application/client"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/infrastructure/persistence"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/interfaces/http/router"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/config"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/tracer"
+	"github.com/gofiber/contrib/otelfiber/v2"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	recover "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -30,10 +36,29 @@ func main() {
 		log.Fatal("Failed to load configuration", zap.Error(err))
 	}
 
+	// Initialize clients
+	transport := client.NewTransport()
+	noRetryClient := client.NewHttpClient(transport)
+	retryableClient := client.NewRetryableClient(transport)
+
+	// Initialize tracer
+	tp := tracer.InitTracer(cfg.Jaeger)
+
+	// Create custom GORM logger with Zap
+	gormLogger := persistence.NewGormZapLogger(log)
+
 	// Initialize database connection with GORM
-	db, err := gorm.Open(postgres.Open(cfg.Database.GetDSN()), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.Database.GetDSN()), &gorm.Config{
+		Logger:      gormLogger,
+		QueryFields: true, // Enable query fields for better tracing
+	})
 	if err != nil {
 		log.Fatal("Failed to connect to database", zap.Error(err))
+	}
+
+	// Register OpenTelemetry callbacks
+	if err := persistence.RegisterGormTracing(db, tp); err != nil {
+		log.Fatal("Failed to register GORM tracing", zap.Error(err))
 	}
 
 	// Auto migrate the schema
@@ -51,8 +76,12 @@ func main() {
 		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	})
 
+	app.Use(recover.New())
+	app.Use(otelfiber.Middleware())
+
 	// Setup routes
-	router.SetupProductRoutes(app, productRepo, productRepo)
+	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
+	router.SetupProductRoutes(app, productRepo, productRepo, noRetryClient, retryableClient)
 
 	// Graceful shutdown channel
 	shutdownChan := make(chan os.Signal, 1)

@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
 	"gorm.io/gorm"

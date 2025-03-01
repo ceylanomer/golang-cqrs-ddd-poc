@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Database DatabaseConfig
 	Server   ServerConfig
+	Jaeger   JaegerConfig
 }
 
 type DatabaseConfig struct {
@@ -26,6 +27,10 @@ type ServerConfig struct {
 	ReadTimeout  int
 	WriteTimeout int
 	IdleTimeout  int
+}
+
+type JaegerConfig struct {
+	URL string `yaml:"url"`
 }
 
 // LoadConfig reads configuration from file or environment variables.
