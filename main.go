@@ -19,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	recover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/gofiber/contrib/fiberzap/v2"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -78,6 +79,9 @@ func main() {
 
 	app.Use(recover.New())
 	app.Use(otelfiber.Middleware())
+	app.Use(fiberzap.New(fiberzap.Config{
+		Logger: log,
+	}))
 
 	// Setup routes
 	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))

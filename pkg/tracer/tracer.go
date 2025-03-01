@@ -39,7 +39,7 @@ func InitTracer(jaegerConfig config.JaegerConfig) *trace.TracerProvider {
 		trace.WithResource(
 			resource.NewWithAttributes(
 				semconv.SchemaURL,
-				semconv.ServiceNameKey.String("golang-fiber-poc"),
+				semconv.ServiceNameKey.String("golang-cqrs-ddd-poc"),
 			)),
 	)
 
