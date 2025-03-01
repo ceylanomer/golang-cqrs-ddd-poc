@@ -35,7 +35,7 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal("Failed to load configuration", zap.Error(err))
+		zap.L().Fatal("Failed to load configuration", zap.Error(err))
 	}
 
 	// Initialize clients
@@ -55,18 +55,18 @@ func main() {
 		QueryFields: true, // Enable query fields for better tracing
 	})
 	if err != nil {
-		log.Fatal("Failed to connect to database", zap.Error(err))
+		zap.L().Fatal("Failed to connect to database", zap.Error(err))
 	}
 
 	// Register OpenTelemetry callbacks
 	err = db.Use(tracing.NewPlugin(tracing.WithTracerProvider(tp)))
 	if err != nil {
-		log.Fatal("Failed to register GORM tracing", zap.Error(err))
+		zap.L().Fatal("Failed to register GORM tracing", zap.Error(err))
 	}
 
 	// Auto migrate the schema
 	if err := db.AutoMigrate(&persistence.ProductModel{}); err != nil {
-		log.Fatal("Failed to migrate database schema", zap.Error(err))
+		zap.L().Fatal("Failed to migrate database schema", zap.Error(err))
 	}
 
 	// Initialize repositories
@@ -104,33 +104,33 @@ func main() {
 	go func() {
 		serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
 		if err := app.Listen(serverAddr); err != nil {
-			log.Fatal("Error starting server", zap.Error(err))
+			zap.L().Fatal("Error starting server", zap.Error(err))
 		}
 	}()
 
-	log.Info("Server started", zap.Int("port", cfg.Server.Port))
+	zap.L().Info("Server started", zap.Int("port", cfg.Server.Port))
 
 	// Wait for shutdown signal
 	<-shutdownChan
-	log.Info("Shutting down server...")
+	zap.L().Info("Shutting down server...")
 
 	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := app.ShutdownWithContext(ctx); err != nil {
-		log.Fatal("Server forced to shutdown", zap.Error(err))
+		zap.L().Fatal("Server forced to shutdown", zap.Error(err))
 	}
 
 	// Close database connection
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Error("Error getting underlying *sql.DB", zap.Error(err))
+		zap.L().Error("Error getting underlying *sql.DB", zap.Error(err))
 	} else {
 		if err := sqlDB.Close(); err != nil {
-			log.Error("Error closing database connection", zap.Error(err))
+			zap.L().Error("Error closing database connection", zap.Error(err))
 		}
 	}
 
-	log.Info("Server gracefully stopped")
+	zap.L().Info("Server gracefully stopped")
 }
