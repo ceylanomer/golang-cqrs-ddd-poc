@@ -2,10 +2,10 @@ package commands
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
+	"github.com/gofiber/fiber/v2"
 )
 
 type ChangeProductStatusCommand struct {
@@ -30,11 +30,11 @@ func NewChangeProductStatusHandler(repo product.Repository) *ChangeProductStatus
 func (h *ChangeProductStatusHandler) Handle(ctx context.Context, cmd *ChangeProductStatusCommand) (*ChangeProductStatusResponse, error) {
 	existingProduct, err := h.repo.GetByID(ctx, cmd.ID)
 	if err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	
 	if existingProduct.Version() != cmd.Version {
-		return nil, errors.New("product has been modified by another process")
+		return nil, fiber.NewError(fiber.StatusConflict, "product has been modified by another process")
 	}
 
 	var actionErr error
@@ -46,15 +46,15 @@ func (h *ChangeProductStatusHandler) Handle(ctx context.Context, cmd *ChangeProd
 	case "discontinue":
 		actionErr = existingProduct.Discontinue()
 	default:
-		return nil, errors.New("invalid status change action")
+		return nil, fiber.NewError(fiber.StatusBadRequest, "invalid status change action")
 	}
 
 	if actionErr != nil {
-		return nil, actionErr
+		return nil, fiber.NewError(fiber.StatusInternalServerError, actionErr.Error())
 	}
 
 	if err := h.repo.Update(ctx, existingProduct); err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	return &ChangeProductStatusResponse{

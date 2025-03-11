@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
+	"github.com/gofiber/fiber/v2"
 )
 
 type ListProductsQuery struct {
@@ -42,7 +43,7 @@ func (h *ListProductsHandler) Handle(ctx context.Context, query *ListProductsQue
 
 	products, err := h.repo.FindAll(ctx, filter)
 	if err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	return &ListProductsResponse{

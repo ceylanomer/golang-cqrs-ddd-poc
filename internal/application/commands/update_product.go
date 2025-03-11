@@ -2,10 +2,10 @@ package commands
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
+	"github.com/gofiber/fiber/v2"
 )
 
 type UpdateProductCommand struct {
@@ -31,23 +31,23 @@ func (h *UpdateProductHandler) Handle(ctx context.Context, cmd *UpdateProductCom
 	// Get existing product from repository
 	existingProduct, err := h.repo.GetByID(ctx, cmd.ID)
 	if err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	// Check version for optimistic locking
 	if existingProduct.Version() != cmd.Version {
-		return nil, errors.New("product has been modified by another process")
+		return nil, fiber.NewError(fiber.StatusConflict, "product has been modified by another process")
 	}
 
 	// Update price if provided
 	if cmd.Price > 0 {
 		newPrice, err := product.NewPrice(cmd.Price, cmd.Currency)
 		if err != nil {
-			return nil, err
+			return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 		// Use domain logic to update price
 		if err := existingProduct.UpdatePrice(newPrice); err != nil {
-			return nil, err
+			return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
 	}
 
@@ -55,13 +55,13 @@ func (h *UpdateProductHandler) Handle(ctx context.Context, cmd *UpdateProductCom
 	if cmd.StockLevel >= 0 {
 		// Use domain logic to update stock
 		if err := existingProduct.UpdateStock(cmd.StockLevel); err != nil {
-			return nil, err
+			return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
 	}
 
 	// Persist updated product
 	if err := h.repo.Update(ctx, existingProduct); err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	return existingProduct, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
+	"github.com/gofiber/fiber/v2"
 )
 
 type CreateProductCommand struct {
@@ -27,23 +28,23 @@ func (h *CreateProductHandler) Handle(ctx context.Context, cmd *CreateProductCom
 	// Create value objects using domain logic
 	price, err := product.NewPrice(cmd.Price, cmd.Currency)
 	if err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	stock, err := product.NewStock(cmd.StockLevel, cmd.StockUnit)
 	if err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	// Create new product using domain factory
 	newProduct, err := product.NewProduct(cmd.Name, cmd.Description, price, stock)
 	if err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	// Persist using repository
 	if err := h.repo.Save(ctx, newProduct); err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	return newProduct, nil

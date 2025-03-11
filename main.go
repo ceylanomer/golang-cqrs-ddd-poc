@@ -12,6 +12,7 @@ import (
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/infrastructure/persistence"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/interfaces/http/router"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/config"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/errorhandler"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/tracer"
 	"github.com/gofiber/contrib/fiberzap/v2"
@@ -19,11 +20,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	recover "github.com/gofiber/fiber/v2/middleware/recover"
+	jwtware "github.com/gofiber/jwt/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/plugin/opentelemetry/tracing"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func main() {
@@ -77,6 +80,7 @@ func main() {
 		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
 		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
+		ErrorHandler: errorhandler.Handle,
 	})
 
 	// Middleware order is important for tracing
@@ -84,16 +88,46 @@ func main() {
 	// Add OpenTelemetry middleware first to create the parent span
 	app.Use(otelfiber.Middleware(otelfiber.WithNext(func(c *fiber.Ctx) bool {
 		// Skip tracing for metrics endpoint
-		return c.Path() == "/metrics"
+		return c.Path() == "/metrics" || c.Path() == "/health"
 	})))
 	// Then add logging middleware
 	app.Use(fiberzap.New(fiberzap.Config{
 		Logger: log,
-		SkipURIs: []string{"/metrics"},
+		SkipURIs: []string{"/metrics", "/health"},
+		FieldsFunc: func(c *fiber.Ctx) []zap.Field {
+			// Get span and trace ID from context
+			spanCtx := trace.SpanContextFromContext(c.UserContext())
+			fields := make([]zap.Field, 0)
+			if spanCtx.IsValid() {
+				fields = append(fields,
+					zap.String("trace_id", spanCtx.TraceID().String()),
+					zap.String("span_id", spanCtx.SpanID().String()),
+				)
+			}
+			return fields
+			// return []zap.Field{
+			// 	zap.String("method", c.Method()),
+			// 	zap.String("path", c.Path()),
+			// 	zap.String("ip", c.Get("X-Real-IP", c.Get("X-Forwarded-For", c.Get("X-Forwarded-For", c.IP())))),
+			// }
+		},
+	}))
+
+	app.Use(jwtware.New(jwtware.Config{
+		SigningKey: []byte("secret"),
+		Filter: func(c *fiber.Ctx) bool {
+			return c.Path() == "/health" || c.Path() == "/metrics" || os.Getenv("ENV") == "local"
+		},
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+		},
 	}))
 
 	// Setup routes
 	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ok"})
+	})
 	router.SetupProductRoutes(app, productRepo, productRepo, noRetryClient, retryableClient)
 
 	// Graceful shutdown channel

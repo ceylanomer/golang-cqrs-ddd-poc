@@ -2,10 +2,10 @@ package persistence
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
+	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
@@ -32,11 +32,11 @@ func (r *ProductRepository) Update(ctx context.Context, product *product.Product
 		Updates(model)
 
 	if result.Error != nil {
-		return result.Error
+		return fiber.NewError(fiber.StatusInternalServerError, result.Error.Error())
 	}
 
 	if result.RowsAffected == 0 {
-		return errors.New("product has been modified by another process")
+		return fiber.NewError(fiber.StatusConflict, "product has been modified by another process")
 	}
 
 	return nil
@@ -45,11 +45,11 @@ func (r *ProductRepository) Update(ctx context.Context, product *product.Product
 func (r *ProductRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	result := r.db.WithContext(ctx).Delete(&ProductModel{}, id)
 	if result.Error != nil {
-		return result.Error
+		return fiber.NewError(fiber.StatusInternalServerError, result.Error.Error())
 	}
 
 	if result.RowsAffected == 0 {
-		return product.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "product not found")
 	}
 
 	return nil
@@ -59,9 +59,9 @@ func (r *ProductRepository) GetByID(ctx context.Context, id uuid.UUID) (*product
 	var model ProductModel
 	if err := r.db.WithContext(ctx).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, product.ErrNotFound
+			return nil, fiber.NewError(fiber.StatusNotFound, "product not found")
 		}
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	return model.ToDomain()
@@ -72,7 +72,7 @@ func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*produc
 	var model ProductModel
 	if err := r.db.WithContext(ctx).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, product.ErrNotFound
+			return nil, fiber.NewError(fiber.StatusNotFound, "product not found")
 		}
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (r *ProductRepository) FindAll(ctx context.Context, filter product.ProductF
 	}
 
 	if err := query.Find(&models).Error; err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	// Convert to read models
@@ -146,7 +146,7 @@ func (r *ProductRepository) FindAll(ctx context.Context, filter product.ProductF
 func (r *ProductRepository) FindByStatus(ctx context.Context, status product.ProductStatus) ([]product.ProductReadModel, error) {
 	var models []ProductModel
 	if err := r.db.WithContext(ctx).Where("status = ?", status).Find(&models).Error; err != nil {
-		return nil, err
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
 	// Convert to read models

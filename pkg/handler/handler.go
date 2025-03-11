@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 )
@@ -31,22 +32,22 @@ func Handler[R Request, Res Response](handler HandlerInterface[R, Res]) fiber.Ha
 
 		if err := c.BodyParser(&req); err != nil && !errors.Is(err, fiber.ErrUnprocessableEntity) {
 			span.RecordError(err)
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 
 		if err := c.ParamsParser(&req); err != nil {
 			span.RecordError(err)
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 
 		if err := c.QueryParser(&req); err != nil {
 			span.RecordError(err)
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 
 		if err := c.ReqHeaderParser(&req); err != nil {
 			span.RecordError(err)
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 
 		/*
@@ -56,9 +57,14 @@ func Handler[R Request, Res Response](handler HandlerInterface[R, Res]) fiber.Ha
 
 		res, err := handler.Handle(ctx, &req)
 		if err != nil {
+			if fiberErr, ok := err.(*fiber.Error); ok {
+				span.RecordError(err)
+				zap.L().Error("Failed to handle request", logger.GetTraceFieldsWithError(ctx, err)...)
+				return fiberErr
+			}
 			span.RecordError(err)
-			zap.L().Error("Failed to handle request", zap.Error(err))
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			zap.L().Error("Failed to handle request", logger.GetTraceFieldsWithError(ctx, err)...)
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
 
 		return c.JSON(res)

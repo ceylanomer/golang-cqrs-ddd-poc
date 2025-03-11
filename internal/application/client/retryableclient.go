@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"github.com/ceylanomer/golang-cqrs-ddd-poc/pkg/logger"
 	"go.uber.org/zap"
 )
 
@@ -38,19 +39,19 @@ func (c *CustomRetryableClient) GetTimeout(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:8081/timeout", nil)
 	if err != nil {
-		zap.L().Error("Failed to create request to timeout", zap.Error(err))
+		zap.L().Error("Failed to create request to timeout", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
 	retryableRequest, err := retryablehttp.FromRequest(req)
 	if err != nil {
-		zap.L().Error("Failed to create retryable request", zap.Error(err))
+		zap.L().Error("Failed to create retryable request", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
 	resp, err := c.Client.Do(retryableRequest)
 	if err != nil {
-		zap.L().Error("Failed to make request to timeout", zap.Error(err))
+		zap.L().Error("Failed to make request to timeout", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
@@ -58,7 +59,7 @@ func (c *CustomRetryableClient) GetTimeout(ctx context.Context) error {
 
 	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		zap.L().Error("Failed to read response from timeout", zap.Error(err))
+		zap.L().Error("Failed to read response from timeout", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
@@ -69,19 +70,19 @@ func (c *CustomRetryableClient) GetError(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:8081/error", nil)
 	if err != nil {
-		zap.L().Error("Failed to create request to google", zap.Error(err))
+		zap.L().Error("Failed to create request to google", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
 	retryableRequest, err := retryablehttp.FromRequest(req)
 	if err != nil {
-		zap.L().Error("Failed to create retryable request", zap.Error(err))
+		zap.L().Error("Failed to create retryable request", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
 	resp, err := c.Client.Do(retryableRequest)
 	if err != nil {
-		zap.L().Error("Failed to make request to error", zap.Error(err))
+		zap.L().Error("Failed to make request to error", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
@@ -89,7 +90,7 @@ func (c *CustomRetryableClient) GetError(ctx context.Context) error {
 
 	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		zap.L().Error("Failed to read response from error", zap.Error(err))
+		zap.L().Error("Failed to read response from error", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
@@ -100,19 +101,19 @@ func (c *CustomRetryableClient) GetTest(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:8081/test", nil)
 	if err != nil {
-		zap.L().Error("Failed to create request to google", zap.Error(err))
+		zap.L().Error("Failed to create request to google", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
 	retryableRequest, err := retryablehttp.FromRequest(req)
 	if err != nil {
-		zap.L().Error("Failed to create retryable request", zap.Error(err))
+		zap.L().Error("Failed to create retryable request", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
 	resp, err := c.Client.Do(retryableRequest)
 	if err != nil {
-		zap.L().Error("Failed to make request to test", zap.Error(err))
+		zap.L().Error("Failed to make request to test", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 
@@ -120,7 +121,7 @@ func (c *CustomRetryableClient) GetTest(ctx context.Context) error {
 
 	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		zap.L().Error("Failed to read response from test", zap.Error(err))
+		zap.L().Error("Failed to read response from test", logger.GetTraceFieldsWithError(ctx, err)...)
 		return err
 	}
 

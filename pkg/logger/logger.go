@@ -1,6 +1,9 @@
 package logger
 
 import (
+	"context"
+
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -24,14 +27,29 @@ func GetLogger() *zap.Logger {
 	return log
 }
 
-func Info(message string, fields ...zap.Field) {
-	log.Info(message, fields...)
+func GetTraceFields(ctx context.Context) []zap.Field {
+	spanCtx := trace.SpanContextFromContext(ctx)
+	fields := make([]zap.Field, 0)
+	if spanCtx.IsValid() {
+		fields = append(fields,
+			zap.String("trace_id", spanCtx.TraceID().String()),
+			zap.String("span_id", spanCtx.SpanID().String()),
+		)
+	}
+	return fields
 }
 
-func Error(message string, fields ...zap.Field) {
-	log.Error(message, fields...)
-}
+func GetTraceFieldsWithError(ctx context.Context, err error) []zap.Field {
+	spanCtx := trace.SpanContextFromContext(ctx)
+	fields := make([]zap.Field, 0)
+	if spanCtx.IsValid() {
+		fields = append(fields,
+			zap.String("trace_id", spanCtx.TraceID().String()),
+			zap.String("span_id", spanCtx.SpanID().String()),
+		)
+	}
 
-func Fatal(message string, fields ...zap.Field) {
-	log.Fatal(message, fields...)
+	fields = append(fields, zap.Error(err))
+
+	return fields
 }

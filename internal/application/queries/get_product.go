@@ -5,6 +5,7 @@ import (
 
 	"github.com/ceylanomer/golang-cqrs-ddd-poc/internal/domain/product"
 	"github.com/google/uuid"
+	"github.com/gofiber/fiber/v2"
 )
 
 type GetProductQuery struct {
@@ -20,5 +21,9 @@ func NewGetProductHandler(repo product.ReadOnlyRepository) *GetProductHandler {
 }
 
 func (h *GetProductHandler) Handle(ctx context.Context, query *GetProductQuery) (*product.ProductReadModel, error) {
-	return h.repo.FindByID(ctx, query.ID)
+	product, err := h.repo.FindByID(ctx, query.ID)
+	if err != nil {
+		return nil, fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	return product, nil
 }
